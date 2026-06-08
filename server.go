@@ -36,7 +36,7 @@ func (s *Server) Start() {
 			fmt.Println("ERR! Faield to accept connection", err)
 			continue
 		}
-		s.handleConnection(conn)
+		go s.handleConnection(conn)
 	}
 }
 
