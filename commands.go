@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -103,6 +104,38 @@ func (h *CommandHandler) Handle(line string) string {
 
 		h.store.Clear()
 		return "OK"
+
+	case "EXPIRE":
+		if len(parts) != 3 {
+			return "ERR! usage: EXPIRE key seconds"
+		}
+
+		key := parts[1]
+
+		seconds, err := strconv.Atoi(parts[2])
+		if err != nil {
+			return "ERR! seconds must be an int"
+		}
+
+		if seconds <= 0 {
+			return "ERR! seconds must be greater than 0"
+		}
+
+		ok := h.store.Expire(key, seconds)
+		if !ok {
+			return "0"
+		}
+
+		return "1"
+
+	case "TTL":
+		if len(parts) != 2 {
+			return "ERR! usage: TTL key"
+		}
+
+		key := parts[1]
+
+		return fmt.Sprintf("%d", h.store.TTL(key))
 
 	case "PING":
 		return "PONG"
