@@ -38,13 +38,13 @@ func main() {
 
 		switch command {
 		case "SET":
-			if len(parts) != 3 {
+			if len(parts) < 3 {
 				fmt.Println("ERR! Usage: SET key value")
 				continue
 			}
 
 			key := parts[1]
-			value := parts[2]
+			value := strings.Join(parts[2:], " ")
 
 			store[key] = value
 
@@ -112,6 +112,24 @@ func main() {
 			for key := range store {
 				fmt.Println(key)
 			}
+
+		case "COUNT":
+			if len(parts) != 1 {
+				fmt.Println("ERR! Usage: COUNT")
+				continue
+			}
+
+			count := len(store)
+			fmt.Println(count)
+
+		case "CLEAR":
+			if len(parts) != 1 {
+				fmt.Println("ERR! Usage: CLEAR")
+				continue
+			}
+
+			store = make(map[string]string)
+			fmt.Println("OK")
 
 		default:
 			fmt.Println("ERR! Unknown command")
