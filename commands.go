@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"unicode"
@@ -10,12 +11,15 @@ import (
 const defaultDataFile = "dump.json"
 
 type CommandHandler struct {
-	store *Store
+	store   *Store
+	aofPath string // appendOnlyFile (log)
+	aofOn   bool   // appendOnlyFile (log) turn off/on
 }
 
 func NewCommandHandler(store *Store) *CommandHandler {
 	return &CommandHandler{
-		store: store,
+		store:   store,
+		aofPath: "appendonly.aof",
 	}
 }
 
@@ -41,6 +45,9 @@ func (h *CommandHandler) Handle(line string) string {
 		value := strings.Join(parts[2:], " ")
 
 		h.store.Set(key, value)
+		if err := h.appendAOF(line); err != nil {
+			return encodeError(err.Error())
+		}
 		return encodeSimpleString("OK")
 
 	case "GET":
@@ -69,6 +76,9 @@ func (h *CommandHandler) Handle(line string) string {
 			return encodeInteger(0)
 		}
 
+		if err := h.appendAOF(line); err != nil {
+			return encodeError(err.Error())
+		}
 		return encodeInteger(1)
 
 	case "EXISTS":
@@ -109,6 +119,9 @@ func (h *CommandHandler) Handle(line string) string {
 		}
 
 		h.store.Clear()
+		if err := h.appendAOF(line); err != nil {
+			return encodeError(err.Error())
+		}
 		return encodeSimpleString("OK")
 
 	case "EXPIRE":
@@ -132,6 +145,9 @@ func (h *CommandHandler) Handle(line string) string {
 			return encodeInteger(0)
 		}
 
+		if err := h.appendAOF(line); err != nil {
+			return encodeError(err.Error())
+		}
 		return encodeInteger(1)
 
 	case "TTL":
@@ -149,7 +165,7 @@ func (h *CommandHandler) Handle(line string) string {
 		}
 
 		path := defaultDataFile
-		if len(path) == 2 {
+		if len(parts) == 2 {
 			path = parts[1]
 		}
 
@@ -170,6 +186,42 @@ func (h *CommandHandler) Handle(line string) string {
 		}
 
 		if err := h.store.Load(path); err != nil {
+			return encodeError(err.Error())
+		}
+
+		return encodeSimpleString("OK")
+
+	case "AOFON":
+		if len(parts) > 2 {
+			return encodeError("usage: AOFON [path]")
+		}
+
+		if len(parts) == 2 {
+			h.aofPath = parts[1]
+		}
+
+		h.aofOn = true
+		return encodeSimpleString("OK")
+
+	case "AOFOFF":
+		if len(parts) != 1 {
+			return encodeError("usage: AOFOFF")
+		}
+
+		h.aofOn = false
+		return encodeSimpleString("OK")
+
+	case "LOADAOF":
+		if len(parts) > 2 {
+			return encodeError("usage: LOADAOF [path]")
+		}
+
+		path := h.aofPath
+		if len(path) == 2 {
+			path = parts[1]
+		}
+
+		if err := h.loadAOF(path); err != nil {
 			return encodeError(err.Error())
 		}
 
@@ -254,4 +306,48 @@ func encodeArray(values []string) string {
 	}
 
 	return builder.String()
+}
+
+func (h *CommandHandler) appendAOF(line string) error {
+	if !h.aofOn {
+		return nil
+	}
+
+	file, err := os.OpenFile(h.aofPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	_, err = file.WriteString(line + "\n")
+	return err
+}
+
+func (h *CommandHandler) loadAOF(path string) error {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	wasAOFOn := h.aofOn
+	h.aofOn = false
+	defer func() {
+		h.aofOn = wasAOFOn
+	}()
+
+	lines := strings.Split(string(bytes), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		response := h.Handle(line)
+		if strings.HasPrefix(response, "-ERR") {
+			return fmt.Errorf("failed to replay %q: %s", line, strings.TrimSpace(response))
+		}
+	}
+
+	return nil
 }
