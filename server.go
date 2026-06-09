@@ -28,7 +28,7 @@ func (s *Server) Start() {
 	defer listener.Close()
 
 	fmt.Println("kv-db server listening on", s.addr)
-	fmt.Println("connect with: nc localhost 6379")
+	fmt.Println("connect with: ncat localhost", strings.TrimPrefix(s.addr, ":"))
 
 	for {
 		conn, err := listener.Accept()

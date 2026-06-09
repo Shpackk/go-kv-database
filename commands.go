@@ -8,18 +8,18 @@ import (
 	"unicode"
 )
 
-const defaultDataFile = "dump.json"
-
 type CommandHandler struct {
-	store   *Store
-	aofPath string // appendOnlyFile (log)
-	aofOn   bool   // appendOnlyFile (log) turn off/on
+	store    *Store
+	dataPath string
+	aofPath  string // appendOnlyFile (log)
+	aofOn    bool   // appendOnlyFile (log) turn off/on
 }
 
-func NewCommandHandler(store *Store) *CommandHandler {
+func NewCommandHandler(store *Store, dataPath string, aofPath string) *CommandHandler {
 	return &CommandHandler{
-		store:   store,
-		aofPath: "appendonly.aof",
+		store:    store,
+		dataPath: dataPath,
+		aofPath:  aofPath,
 	}
 }
 
@@ -164,7 +164,7 @@ func (h *CommandHandler) Handle(line string) string {
 			return encodeError("usage: SAVE [path]")
 		}
 
-		path := defaultDataFile
+		path := h.dataPath
 		if len(parts) == 2 {
 			path = parts[1]
 		}
@@ -180,7 +180,7 @@ func (h *CommandHandler) Handle(line string) string {
 			return encodeError("usage: LOAD [path]")
 		}
 
-		path := defaultDataFile
+		path := h.dataPath
 		if len(parts) == 2 {
 			path = parts[1]
 		}
