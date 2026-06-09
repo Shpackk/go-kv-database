@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
 	"sync"
 	"time"
 )
@@ -9,6 +11,11 @@ type Store struct {
 	mu      sync.RWMutex
 	data    map[string]string
 	expires map[string]time.Time
+}
+
+type storeSnapshot struct {
+	Data    map[string]string    `json:"data"`
+	Expires map[string]time.Time `json:"expires"`
 }
 
 func NewStore() *Store {
@@ -212,4 +219,60 @@ func (s *Store) TTL(key string) int {
 	}
 
 	return int(remaining)
+}
+
+func (s *Store) Save(path string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.deleteExpiredLocked()
+
+	snapshot := storeSnapshot{
+		Data:    make(map[string]string, len(s.data)),
+		Expires: make(map[string]time.Time, len(s.expires)),
+	}
+
+	for key, value := range s.data {
+		snapshot.Data[key] = value
+	}
+
+	for key, expireAt := range s.expires {
+		snapshot.Expires[key] = expireAt
+	}
+
+	bytes, err := json.MarshalIndent(snapshot, "", " ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, bytes, 0644)
+}
+
+func (s *Store) Load(path string) error {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	var snapshot storeSnapshot
+	if err := json.Unmarshal(bytes, &snapshot); err != nil {
+		return err
+	}
+
+	if snapshot.Data == nil {
+		snapshot.Data = make(map[string]string)
+	}
+
+	if snapshot.Expires == nil {
+		snapshot.Expires = make(map[string]time.Time)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.data = snapshot.Data
+	s.expires = snapshot.Expires
+	s.deleteExpiredLocked()
+
+	return nil
 }

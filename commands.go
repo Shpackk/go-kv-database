@@ -7,6 +7,8 @@ import (
 	"unicode"
 )
 
+const defaultDataFile = "dump.json"
+
 type CommandHandler struct {
 	store *Store
 }
@@ -140,6 +142,38 @@ func (h *CommandHandler) Handle(line string) string {
 		key := parts[1]
 
 		return encodeInteger(h.store.TTL(key))
+
+	case "SAVE":
+		if len(parts) > 2 {
+			return encodeError("usage: SAVE [path]")
+		}
+
+		path := defaultDataFile
+		if len(path) == 2 {
+			path = parts[1]
+		}
+
+		if err := h.store.Save(path); err != nil {
+			return encodeError(err.Error())
+		}
+
+		return encodeSimpleString("OK")
+
+	case "LOAD":
+		if len(parts) > 2 {
+			return encodeError("usage: LOAD [path]")
+		}
+
+		path := defaultDataFile
+		if len(parts) == 2 {
+			path = parts[1]
+		}
+
+		if err := h.store.Load(path); err != nil {
+			return encodeError(err.Error())
+		}
+
+		return encodeSimpleString("OK")
 
 	case "PING":
 		return encodeSimpleString("PONG")
