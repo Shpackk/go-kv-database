@@ -32,123 +32,123 @@ func (h *CommandHandler) Handle(line string) string {
 	switch command {
 	case "SET":
 		if len(parts) < 3 {
-			return "ERR! usage: SET key value"
+			return encodeError("usage: SET key value")
 		}
 
 		key := parts[1]
 		value := strings.Join(parts[2:], " ")
 
 		h.store.Set(key, value)
-		return "OK"
+		return encodeSimpleString("OK")
 
 	case "GET":
 		if len(parts) != 2 {
-			return "ERR! usage: GET key"
+			return encodeError("usage: GET key")
 		}
 
 		key := parts[1]
 
 		value, ok := h.store.Get(key)
 		if !ok {
-			return "(nil)"
+			return encodeNil()
 		}
 
-		return value
+		return encodeBulkString(value)
 
 	case "DEL":
 		if len(parts) != 2 {
-			return "ERR! usage: DEL key"
+			return encodeError("usage: DEL key")
 		}
 
 		key := parts[1]
 
 		deleted := h.store.Del(key)
 		if !deleted {
-			return "0"
+			return encodeInteger(0)
 		}
 
-		return "1"
+		return encodeInteger(1)
 
 	case "EXISTS":
 		if len(parts) != 2 {
-			return "ERR! usage: EXISTS key"
+			return encodeError("usage: EXISTS key")
 		}
 
 		key := parts[1]
 
 		if h.store.Exists(key) {
-			return "1"
+			return encodeInteger(1)
 		}
 
-		return "0"
+		return encodeInteger(0)
 
 	case "KEYS":
 		if len(parts) != 1 {
-			return "ERR! usage: KEYS"
+			return encodeError("usage: KEYS")
 		}
 
 		keys := h.store.Keys()
 		if len(keys) == 0 {
-			return "(empty)"
+			return encodeArray([]string{})
 		}
 
-		return strings.Join(keys, " ")
+		return encodeArray(keys)
 
 	case "COUNT":
 		if len(parts) != 1 {
-			return "ERR! usage: COUNT"
+			return encodeError("usage: COUNT")
 		}
 
-		return fmt.Sprintf("%d", h.store.Count())
+		return encodeInteger(h.store.Count())
 
 	case "CLEAR":
 		if len(parts) != 1 {
-			return "ERR! usage: CLEAR"
+			return encodeError("usage: CLEAR")
 		}
 
 		h.store.Clear()
-		return "OK"
+		return encodeSimpleString("OK")
 
 	case "EXPIRE":
 		if len(parts) != 3 {
-			return "ERR! usage: EXPIRE key seconds"
+			return encodeError("usage: EXPIRE key seconds")
 		}
 
 		key := parts[1]
 
 		seconds, err := strconv.Atoi(parts[2])
 		if err != nil {
-			return "ERR! seconds must be an int"
+			return encodeError("seconds must be an int")
 		}
 
 		if seconds <= 0 {
-			return "ERR! seconds must be greater than 0"
+			return encodeError("seconds must be greater than 0")
 		}
 
 		ok := h.store.Expire(key, seconds)
 		if !ok {
-			return "0"
+			return encodeInteger(0)
 		}
 
-		return "1"
+		return encodeInteger(1)
 
 	case "TTL":
 		if len(parts) != 2 {
-			return "ERR! usage: TTL key"
+			return encodeError("usage: TTL key")
 		}
 
 		key := parts[1]
 
-		return fmt.Sprintf("%d", h.store.TTL(key))
+		return encodeInteger(h.store.TTL(key))
 
 	case "PING":
-		return "PONG"
+		return encodeSimpleString("PONG")
 
 	case "EXIT":
-		return "dont come back"
+		return encodeSimpleString("OK")
 
 	default:
-		return "ERR! unknown command"
+		return encodeError("unknown command")
 	}
 }
 
@@ -188,4 +188,36 @@ func parseCommandLine(line string) ([]string, error) {
 	}
 
 	return parts, nil
+}
+
+func encodeSimpleString(value string) string {
+	return fmt.Sprintf("+%s\r\n", value)
+}
+
+func encodeError(message string) string {
+	return fmt.Sprintf("-ERR %s\r\n", message)
+}
+
+func encodeInteger(value int) string {
+	return fmt.Sprintf(":%d\r\n", value)
+}
+
+func encodeBulkString(value string) string {
+	return fmt.Sprintf("$%d\r\n%s\r\n", len(value), value)
+}
+
+func encodeNil() string {
+	return "$-1\r\n"
+}
+
+func encodeArray(values []string) string {
+	var builder strings.Builder
+
+	builder.WriteString(fmt.Sprintf("*%d\r\n", len(values)))
+
+	for _, value := range values {
+		builder.WriteString((encodeBulkString(value)))
+	}
+
+	return builder.String()
 }

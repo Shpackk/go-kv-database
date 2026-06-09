@@ -61,7 +61,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		response := s.handler.Handle(line)
 
-		_, err := conn.Write([]byte(response + "\n"))
+		_, err := conn.Write([]byte(response))
 		if err != nil {
 			fmt.Println("ERR! failed to write response to", addr+":", err)
 			return
