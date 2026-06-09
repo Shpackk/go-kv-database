@@ -217,7 +217,7 @@ func (h *CommandHandler) Handle(line string) string {
 		}
 
 		path := h.aofPath
-		if len(path) == 2 {
+		if len(parts) == 2 {
 			path = parts[1]
 		}
 
