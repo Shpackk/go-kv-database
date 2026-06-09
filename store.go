@@ -142,6 +142,49 @@ func (s *Store) Expire(key string, seconds int) bool {
 	return true
 }
 
+func (s *Store) deleteExpiredLocked() int {
+	deleted := 0
+
+	for key := range s.data {
+		if s.isExpired(key) {
+			delete(s.data, key)
+			delete(s.expires, key)
+			deleted++
+		}
+	}
+
+	return deleted
+}
+
+func (s *Store) DeleteExpired() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.deleteExpiredLocked()
+}
+
+func (s *Store) StartActiveExpiration(interval time.Duration) func() {
+	ticker := time.NewTicker(interval)
+	stop := make(chan struct{})
+
+	go func() {
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				s.DeleteExpired()
+			case <-stop:
+				return
+			}
+		}
+	}()
+
+	return func() {
+		close(stop)
+	}
+}
+
 func (s *Store) TTL(key string) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
