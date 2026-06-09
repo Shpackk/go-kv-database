@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 type CommandHandler struct {
@@ -17,7 +18,10 @@ func NewCommandHandler(store *Store) *CommandHandler {
 }
 
 func (h *CommandHandler) Handle(line string) string {
-	parts := strings.Fields(line)
+	parts, err := parseCommandLine(line)
+	if err != nil {
+		return "ERR! " + err.Error()
+	}
 
 	if len(parts) == 0 {
 		return ""
@@ -146,4 +150,42 @@ func (h *CommandHandler) Handle(line string) string {
 	default:
 		return "ERR! unknown command"
 	}
+}
+
+func parseCommandLine(line string) ([]string, error) {
+	var parts []string
+	var current strings.Builder
+
+	inQuotes := false
+	tokenStarted := false
+
+	for _, ch := range line {
+		if ch == '"' {
+			inQuotes = !inQuotes
+			tokenStarted = true
+			continue
+		}
+
+		if unicode.IsSpace(ch) && !inQuotes {
+			if tokenStarted {
+				parts = append(parts, current.String())
+				current.Reset()
+				tokenStarted = false
+			}
+			continue
+		}
+
+		current.WriteRune(ch)
+		tokenStarted = true
+	}
+
+	if inQuotes {
+		return nil, fmt.Errorf("unterminated quote")
+	}
+
+	if tokenStarted {
+		parts = append(parts, current.String())
+	}
+
+	return parts, nil
 }
