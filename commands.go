@@ -243,9 +243,36 @@ func parseCommandLine(line string) ([]string, error) {
 	var current strings.Builder
 
 	inQuotes := false
+	escaping := false
 	tokenStarted := false
 
 	for _, ch := range line {
+		if escaping {
+			switch ch {
+			case 'n':
+				current.WriteRune('\n')
+			case 'r':
+				current.WriteRune('\r')
+			case 't':
+				current.WriteRune('\t')
+			case '"':
+				current.WriteRune('"')
+			case '\\':
+				current.WriteRune('\\')
+			default:
+				current.WriteRune(ch)
+			}
+			escaping = false
+			tokenStarted = true
+			continue
+		}
+
+		if inQuotes && ch == '\\' {
+			escaping = true
+			tokenStarted = true
+			continue
+		}
+
 		if ch == '"' {
 			inQuotes = !inQuotes
 			tokenStarted = true
@@ -267,6 +294,10 @@ func parseCommandLine(line string) ([]string, error) {
 
 	if inQuotes {
 		return nil, fmt.Errorf("unterminated quote")
+	}
+
+	if escaping {
+		current.WriteRune('\\')
 	}
 
 	if tokenStarted {

@@ -38,6 +38,10 @@ func readRESPArray(reader *bufio.Reader, header string) ([]string, error) {
 		return nil, fmt.Errorf("invalid RESP array header")
 	}
 
+	if count < 0 {
+		return nil, fmt.Errorf("RESP arrays with negative length are not supported")
+	}
+
 	parts := make([]string, 0, count)
 
 	for i := 0; i < count; i++ {
@@ -54,6 +58,10 @@ func readRESPArray(reader *bufio.Reader, header string) ([]string, error) {
 		size, err := strconv.Atoi(strings.TrimPrefix(bulkHeader, "$"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid bulk string size")
+		}
+
+		if size < 0 {
+			return nil, fmt.Errorf("RESP bulk strings with negative length are not supported")
 		}
 
 		value := make([]byte, size+2)

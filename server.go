@@ -59,6 +59,10 @@ func (s *Server) handleConnection(conn net.Conn) {
 			return
 		}
 
+		if line == "" {
+			continue
+		}
+
 		response := s.handler.Handle(line)
 
 		_, err = conn.Write([]byte(response))
