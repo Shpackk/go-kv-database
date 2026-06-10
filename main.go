@@ -11,7 +11,18 @@ import (
 func main() {
 	port := flag.Int("port", 6379, "server port")
 	dataDir := flag.String("data", ".", "data directory")
+	clientMode := flag.Bool("client", false, "run client instead of server")
 	flag.Parse()
+
+	addr := fmt.Sprintf("localhost:%d", *port)
+
+	if *clientMode {
+		if err := RunClient(addr); err != nil {
+			fmt.Println("ERR!", err)
+		}
+
+		return
+	}
 
 	if err := os.MkdirAll(*dataDir, 0755); err != nil {
 		fmt.Println("ERR! failed to create data directory", err)
@@ -20,7 +31,7 @@ func main() {
 
 	dataPath := filepath.Join(*dataDir, "dump.json")
 	aofPath := filepath.Join(*dataDir, "appendonly.aof")
-	addr := fmt.Sprintf(":%d", *port)
+	serverAddr := fmt.Sprintf(":%d", *port)
 
 	store := NewStore()
 	stopExpiration := store.StartActiveExpiration(1 * time.Second)
@@ -28,6 +39,6 @@ func main() {
 
 	handler := NewCommandHandler(store, dataPath, aofPath)
 
-	server := NewServer(addr, handler)
+	server := NewServer(serverAddr, handler)
 	server.Start()
 }
