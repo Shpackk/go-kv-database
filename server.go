@@ -50,18 +50,18 @@ func (s *Server) handleConnection(conn net.Conn) {
 		fmt.Println("client disconnected", addr)
 	}()
 
-	scanner := bufio.NewScanner(conn)
+	reader := bufio.NewReader(conn)
 
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		if line == "" {
-			continue
+	for {
+		line, err := readCommand(reader)
+		if err != nil {
+			fmt.Println("ERR! connection read failed from", addr+":", err)
+			return
 		}
 
 		response := s.handler.Handle(line)
 
-		_, err := conn.Write([]byte(response))
+		_, err = conn.Write([]byte(response))
 		if err != nil {
 			fmt.Println("ERR! failed to write response to", addr+":", err)
 			return
@@ -69,10 +69,6 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		if strings.ToUpper(line) == "EXIT" {
 			return
-		}
-
-		if err := scanner.Err(); err != nil {
-			fmt.Println("ERR! connection read failed from", addr+":", err)
 		}
 	}
 }
